@@ -18,7 +18,7 @@ namespace QvEventLogConnectorSimple
         public override string CreateConnectionString()
         {
             QvxLog.Log(QvxLogFacility.Application, QvxLogSeverity.Debug, "CreateConnectionString()");
-            return "server=127.0.0.1;Port=5432;user id=postgres; password=123456;database=ConectorAditiStaging"; 
+            return "server=127.0.0.1;Port=5432;user id=postgres; password=123456;database=ConectorAditiStaging";  
         }
 
 
