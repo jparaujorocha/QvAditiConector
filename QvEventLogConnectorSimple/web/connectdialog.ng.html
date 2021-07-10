@@ -1,22 +1,87 @@
 ﻿<div class="qveventlogconnectdialogcontainer">
-	<div class="qveventlogconnectdialog" qv-global-escape="onEscape()">
-		<h1 q-translation="{{titleText}}"></h1>
-		
-		<h2>Connector Description</h2>
-		<div>{{info}}</div>
+    <div class="qveventlogconnectdialog" qv-global-escape="onEscape()">
 
-		<div class="main">
-			<input type="text" ng-model="name" placeholder="Connection name" />
-			<input type="text" ng-model="username" placeholder="Username" />
-			<input type="password" ng-model="password" placeholder="Password" />
-		</div>
+        <header class="connsdk-odbc-connect-dialog-host__dialog__header"></header>
+        <label class="connsdk-odbc-connect-dialog-host__dialog__header__title">{{titleText}}</label>
 
-		<div class="connectionInfo" ng-class="{'success': connectionSuccessful}">{{connectionInfo}}</div>
+        <h2>Conector Aditi</h2>
+        <div>{{info}}</div>
 
-		<div class="footer">
-			<button ng-click="onCancelClicked()">Cancel</button>
-			<button ng-click="onTestConnectionClicked()">Test Connection</button>
-			<button ng-click="onOKClicked()" ng-disabled="!isOkEnabled()" q-translation="{{saveButtonText}}"></button>
-		</div>
-	</div>
+        <form name="form" role="form">
+            <div class="form-group">
+                <table>
+                    <tr>
+
+                        <Property styleName="mediumselect">
+                            <td>
+
+                                <label class="lui-label">
+                                    Servidor
+                                </label>
+                                <select class="lui-select" name="ServerType" ng-model="ServerValue" ng-change="ServerChanged()">
+                                    <option value="Oracle">Oracle</option>
+                                    <option value="Sql_Server">Sql Server</option>
+                                    <option value="PostGreSql">PostGreSql</option>
+                                </select><br />
+                            </td>
+                        </Property>
+                    </tr>
+
+                    <tr>
+                        <td>
+                            <label class="lui-label">Nome da conexão(Qlik)</label>
+                            <input class="lui-input" type="text" ng-model="name" placeholder="Nome da Conexão(Qlik)" required />
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td>
+                            <label class="lui-label">User Id</label>
+                            <input class="lui-input" type="text" ng-model="username" placeholder="User Id" required />
+                            <label class="lui-label">Senha</label>
+                            <input class="lui-input" type="password" ng-model="password" placeholder="Senha" required />
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+
+            <div class="form-group">
+                <table>
+                    <tr ng-hide="ServerStatus == 'PostGreSql' || ServerStatus == 'Sql_Server'">
+                        <td></td>
+                    </tr>
+
+                    <tr ng-hide="ServerStatus == 'PostGreSql' || ServerStatus == 'Oracle'">
+                        <td>
+                            <label class="lui-label">Initial Catalog</label>
+                            <input class="lui-input" type="text" ng-model="initialcatalog" placeholder="Initial Catalog" required />
+                        </td>
+                    </tr>
+                    <tr ng-hide="ServerStatus == 'Oracle' || ServerStatus == 'Sql_Server'">
+                        <td>
+                            <label class="lui-label">Server</label>
+                            <input class="lui-input" type="text" ng-model="serverpostgresql" placeholder="Server" required />
+
+                            <label class="lui-label">Port</label>
+                            <input class="lui-input" type="text" ng-model="portpostgresql" placeholder="Port" required />
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="connectionInfo" ng-class="{'success': connectionSuccessful}">{{connectionInfo}}</div>
+
+            <div class="footer">
+                <button ng-click="onCancelClicked()">Cancelar</button>
+                <button ng-click="onTestConnectionClicked()">Testar Conexão</button>
+                <button ng-click="onOKClicked()" ng-disabled="!isOkEnabled()" q-translation="{{saveButtonText}}"></button>
+            </div>
+        </form>
+
+    </div>
+    <div>
+
+    </div>
+
 </div>

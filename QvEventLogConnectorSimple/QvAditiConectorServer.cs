@@ -10,6 +10,7 @@ namespace QvEventLogConnectorSimple
 {
     internal class QvAditiConectorServer : QvxServer
     {
+        string parameters = "";
         public override QvxConnection CreateConnection()
         {
             return new QvAditiConectorConnection();
@@ -18,7 +19,7 @@ namespace QvEventLogConnectorSimple
         public override string CreateConnectionString()
         {
             QvxLog.Log(QvxLogFacility.Application, QvxLogSeverity.Debug, "CreateConnectionString()");
-            return "server=127.0.0.1;Port=5432;user id=postgres; password=123456;database=ConectorAditiStaging";  
+            return "localhost";
         }
 
 
@@ -42,11 +43,18 @@ namespace QvEventLogConnectorSimple
              * below
              */
 
-            string provider, host, username, password;
+
+            string username = "postgres", password = "123456";
+            connection.MParameters.TryGetValue("Xtype", out parameters);
+
+            var con = CreateConnection();
+            con.MParameters = connection.MParameters;
+            /*
             connection.MParameters.TryGetValue("provider", out provider); // Set to the name of the connector by QlikView Engine
             connection.MParameters.TryGetValue("userid", out username); // Set when creating new connection or from inside the QlikView Management Console (QMC)
-            connection.MParameters.TryGetValue("password", out password); // Same as for username
-            connection.MParameters.TryGetValue("host", out host); // Defined when calling createNewConnection in connectdialog.js
+            connection.MParameters.TryGetValue("senha", out password); // Same as for username
+            //connection.MParameters.TryGetValue("host", out host); // Defined when calling createNewConnection in connectdialog.js
+            */
 
             switch (method)
             {
@@ -75,12 +83,18 @@ namespace QvEventLogConnectorSimple
         public bool verifyCredentials (string username, string password) {
             return true;
         }
+        
+        public string[] RecuperaParametrosConnectionString(string parametros)
+        {
+            string[] separadores = new string[] { "-*" };
+            return parametros.Split(separadores, 0);
+        }
 
         public QvDataContractResponse getInfo()
         {
             return new Info
             {
-                qMessage = "Selecione o servidor e digite os dados informados."
+                qMessage = "Selecione o servidor e digite os dados informados. "
             };
         }
 
@@ -131,7 +145,7 @@ namespace QvEventLogConnectorSimple
 
             if (TestarConexao(tipoConexao, connectionString))
             {
-                message = "Credentials OK!";
+                message = "Conexão realizada com sucesso!";
             }
             return new Info { qMessage = message };
         }
@@ -139,7 +153,7 @@ namespace QvEventLogConnectorSimple
 
         public bool TestarConexao(string tipoConexao, string connectionString)
         {
-            /*
+            
             if (tipoConexao == EnumTipoDataBase.PostGreSql.ToString())
             {
                 string stringConnectionPostGreSqlStaging = connectionString;
@@ -167,8 +181,8 @@ namespace QvEventLogConnectorSimple
 
                 return true;
             }
-            */
-            return true;
+            
+            return false;
         }
 
     }

@@ -56,3 +56,19 @@
 .qveventlogconnectdialog .footer button[disabled=disabled] {
 	color: lightgrey;
 }
+
+.hideOracle {
+    display: none
+}
+
+.hideSqlServer {
+    display: none
+}
+
+.hidePostGreSql {
+    display: none
+}
+
+.showFieldsServer {
+    visibility: visible
+}
