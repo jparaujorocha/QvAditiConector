@@ -130,7 +130,9 @@
     </Compile>
     <Compile Include="QvAditiConectorConnection.cs" />
     <Compile Include="QvAditiConectorServer.cs" />
+    <Compile Include="Util\ClsUtil.cs" />
     <Compile Include="Util\Enums\Enum.cs" />
+    <Compile Include="Util\LogApp.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Properties\Resources.resx">

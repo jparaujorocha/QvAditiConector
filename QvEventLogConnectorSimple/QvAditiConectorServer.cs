@@ -4,16 +4,19 @@ using System.Security.Authentication;
 using Npgsql;
 using Oracle.ManagedDataAccess.Client;
 using QlikView.Qvx.QvxLibrary;
+using QvEventLogConnectorSimple.Util;
 using static QvEventLogConnectorSimple.Util.Enums.Enum;
 
 namespace QvEventLogConnectorSimple
 {
     internal class QvAditiConectorServer : QvxServer
     {
-        string parameters = "";
+        private string _parameters = "";
+        private QvxConnection _qvxConnection;
+
         public override QvxConnection CreateConnection()
         {
-            return new QvAditiConectorConnection();
+            return new QvAditiConectorConnection(_qvxConnection);
         }
 
         public override string CreateConnectionString()
@@ -31,66 +34,38 @@ namespace QvEventLogConnectorSimple
         {
             QvDataContractResponse response;
 
-            /**
-             * -- How to get hold of connection details? --
-             *
-             * Provider, username and password are always available in
-             * connection.MParameters if they exist in the connection
-             * stored in the QlikView Repository Service (QRS).
-             *
-             * If there are any other user/connector defined parameters in the
-             * connection string they can be retrieved in the same way as seen
-             * below
-             */
+            _qvxConnection = connection;
+            connection = CreateConnection();
 
-
-            string username = "postgres", password = "123456";
-            connection.MParameters.TryGetValue("Xtype", out parameters);
-
-            var con = CreateConnection();
-            con.MParameters = connection.MParameters;
-            /*
-            connection.MParameters.TryGetValue("provider", out provider); // Set to the name of the connector by QlikView Engine
-            connection.MParameters.TryGetValue("userid", out username); // Set when creating new connection or from inside the QlikView Management Console (QMC)
-            connection.MParameters.TryGetValue("senha", out password); // Same as for username
-            //connection.MParameters.TryGetValue("host", out host); // Defined when calling createNewConnection in connectdialog.js
-            */
+            connection.MParameters.TryGetValue("Xtype", out _parameters);
 
             switch (method)
             {
                 case "getInfo":
-                    response = getInfo();
+                    response = GetInfo();
                     break;
                 case "getDatabases":
-                    response = getDatabases(username, password);
+                    response = GetDatabases();
                     break;
                 case "getTables":
-                    response = getTables(username, password, connection, userParameters[0], userParameters[1]);
+                    response = GetTables(connection);
                     break;
                 case "getFields":
-                    response = getFields(username, password, connection, userParameters[0], userParameters[1], userParameters[2]);
+                    response = GetFields(connection, userParameters[2]);
                     break;
                 case "testConnection":
-                    response = testConnection(userParameters[0], userParameters[1]);
+                    response = TestConnection(userParameters[0], userParameters[1]);
                     break;
                 default:
                     response = new Info { qMessage = "Unknown command" };
                     break;
             }
-            return ToJson(response);    // serializes response into JSON string
+
+            return ToJson(response);
+
         }
 
-        public bool verifyCredentials (string username, string password) {
-            return true;
-        }
-        
-        public string[] RecuperaParametrosConnectionString(string parametros)
-        {
-            string[] separadores = new string[] { "-*" };
-            return parametros.Split(separadores, 0);
-        }
-
-        public QvDataContractResponse getInfo()
+        private QvDataContractResponse GetInfo()
         {
             return new Info
             {
@@ -98,48 +73,36 @@ namespace QvEventLogConnectorSimple
             };
         }
 
-        public QvDataContractResponse getDatabases(string username, string password)
+        private QvDataContractResponse GetDatabases()
         {
-            if (verifyCredentials(username, password))
+            return new QvDataContractDatabaseListResponse
             {
-                return new QvDataContractDatabaseListResponse
+                qDatabases = new Database[]
                 {
-                    qDatabases = new Database[]
-                    {
                         new Database {qName = "ConectorAditiStaging"}
-                    }
-                };
-            }
-            return new Info { qMessage = "Erro nas credenciais!" };
+                }
+            };
         }
 
-        public QvDataContractResponse getTables(string username, string password, QvxConnection connection, string database, string owner)
+        private QvDataContractResponse GetTables(QvxConnection connection)
         {
-            if (verifyCredentials(username, password))
+            return new QvDataContractTableListResponse
             {
-                return new QvDataContractTableListResponse
-                {
-                    qTables = connection.MTables
-                };
-            }
-            return new Info { qMessage = "Erro nas credenciais!" };
+                qTables = connection.MTables
+            };
         }
 
-        public QvDataContractResponse getFields(string username, string password, QvxConnection connection, string database, string owner, string table)
+        private QvDataContractResponse GetFields(QvxConnection connection, string table)
         {
-            if (verifyCredentials(username, password))
-            {
-                var currentTable = connection.FindTable(table, connection.MTables);
+            var currentTable = connection.FindTable(table, connection.MTables);
 
-                return new QvDataContractFieldListResponse
-                {
-                    qFields = (currentTable != null) ? currentTable.Fields : new QvxField[0]
-                };
-            }
-            return new Info { qMessage = "Erro nas credenciais!" };
+            return new QvDataContractFieldListResponse
+            {
+                qFields = (currentTable != null) ? currentTable.Fields : new QvxField[0]
+            };
         }
 
-        public QvDataContractResponse testConnection(string tipoConexao, string connectionString)
+        private QvDataContractResponse TestConnection(string tipoConexao, string connectionString)
         {
             string message = "Conexão com erro. Confira os dados ou o servidor.";
 
@@ -150,16 +113,16 @@ namespace QvEventLogConnectorSimple
             return new Info { qMessage = message };
         }
 
-
-        public bool TestarConexao(string tipoConexao, string connectionString)
+        private bool TestarConexao(string tipoConexao, string connectionString)
         {
-            
+
             if (tipoConexao == EnumTipoDataBase.PostGreSql.ToString())
             {
                 string stringConnectionPostGreSqlStaging = connectionString;
                 NpgsqlConnection connectionPostGreSqlStaging = new NpgsqlConnection(stringConnectionPostGreSqlStaging);
                 connectionPostGreSqlStaging.Open();
                 connectionPostGreSqlStaging.Close();
+
                 return true;
             }
 
@@ -181,7 +144,7 @@ namespace QvEventLogConnectorSimple
 
                 return true;
             }
-            
+
             return false;
         }
 

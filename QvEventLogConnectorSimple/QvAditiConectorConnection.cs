@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using Npgsql;
 using Oracle.ManagedDataAccess.Client;
 using QlikView.Qvx.QvxLibrary;
+using QvEventLogConnectorSimple.Util;
 using static QvEventLogConnectorSimple.Util.Enums.Enum;
 
 namespace QvEventLogConnectorSimple
@@ -16,38 +17,55 @@ namespace QvEventLogConnectorSimple
     {
         private string _nomeTabela;
         private string _tipoConexao;
-        private string _connectionString = " ";
+        private string _connectionString;
         private IDataReader _dataReaderStagingArea;
-        private string _parameters = "";
+        private string _parameters;
+        private readonly ClsUtil _util;
+
+        public QvAditiConectorConnection(QvxConnection connection)
+        {
+
+            if (connection != null && connection.MParameters != null && connection.MParameters.Count > 0)
+                this.MParameters = connection.MParameters;
+
+            _util = new ClsUtil();
+            _nomeTabela = " ";
+            _tipoConexao = " ";
+            _connectionString = " ";
+            _parameters = " ";
+            _connectionString = " ";
+            _dataReaderStagingArea = null;
+            Init();
+        }
+
         public override void Init()
         {
             QvxLog.SetLogLevels(true, true);
 
             QvxLog.Log(QvxLogFacility.Application, QvxLogSeverity.Notice, "Init()");
-            
+
             try
             {
-                _nomeTabela = " ";
-                _tipoConexao = " ";
-                _connectionString = " ";
-                _dataReaderStagingArea = null;
                 GetParametersFromConnection();
 
-                string[] connectionStringParameters = RecuperaParametrosConnectionString(_parameters);
-                _tipoConexao = connectionStringParameters[0];
-                string connectionString = GetConnectionString(connectionStringParameters);
-
-                bool conexaoOk = TestarConexao(_tipoConexao, connectionString);
-
-                if (conexaoOk == true)
+                if (string.IsNullOrWhiteSpace(_parameters) == false)
                 {
-                    _connectionString = connectionString;
-                    SetInformationsFromStagingArea(_tipoConexao, _connectionString);
-                }
+                    string[] connectionStringParameters = _util.RecuperaParametrosConnectionString(_parameters);
+                    _tipoConexao = connectionStringParameters[0];
+                    string connectionString = GetConnectionString(connectionStringParameters);
 
-                else
-                {
-                    QvxLog.Log(QvxLogFacility.Audit, QvxLogSeverity.Error, "Init() Erro de conexão. Verifique os dados ou o servidor.");
+                    bool conexaoOk = TestarConexao(_tipoConexao, connectionString);
+
+                    if (conexaoOk == true)
+                    {
+                        _connectionString = connectionString;
+                        SetInformationsFromStagingArea(_tipoConexao, _connectionString);
+                    }
+
+                    else
+                    {
+                        QvxLog.Log(QvxLogFacility.Audit, QvxLogSeverity.Error, "Init() Erro de conexão. Verifique os dados ou o servidor.");
+                    }
                 }
 
             }
@@ -66,7 +84,10 @@ namespace QvEventLogConnectorSimple
 
         private void GetParametersFromConnection()
         {
-            MParameters.TryGetValue("Xtype", out _parameters);
+            if (this.MParameters != null && this.MParameters.Count > 0)
+            {
+                this.MParameters.TryGetValue("Xtype", out _parameters);
+            }
         }
 
         private string GetConnectionString(string[] parameters)
@@ -88,14 +109,6 @@ namespace QvEventLogConnectorSimple
             }
 
             return connectionString;
-        }
-
-        private IEnumerable<QvxDataRow> GetApplicationEvents()
-        {
-            while (_dataReaderStagingArea.Read())
-            {
-                yield return MakeEntry(FindTable(_nomeTabela, MTables), _dataReaderStagingArea);
-            }
         }
 
         private QvxDataRow MakeEntry(QvxTable table, IDataReader dataReader)
@@ -211,13 +224,6 @@ namespace QvEventLogConnectorSimple
                     });
                 }
             }
-        }
-
-
-        public string[] RecuperaParametrosConnectionString(string parametros)
-        {
-            string[] separadores = new string[] { "-*" };
-            return parametros.Split(separadores, 0);
         }
 
         private bool TestarConexao(string tipoConexao, string connectionString)
