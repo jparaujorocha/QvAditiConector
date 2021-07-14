@@ -191,6 +191,8 @@
 :: Copy web files to bin
 xcopy "$(ProjectDir)web\*.*" "$(ProjectDir)bin\$(ConfigurationName)\web\" /e /y /i /r /q
 
+copy "$(TargetDir)\*" "C:\Users\Joao Pedro\AppData\Local\Programs\Qlik\Sense\Connectors\QvEventLogConnectorSimple"
+
 if %25COMPUTERNAME%25==SELUN-MOS1 copy "$(TargetPath)" "C:\Program Files\Common Files\QlikTech\Custom Data\QvEventLogConnectorSimple"
 if %25COMPUTERNAME%25==SELUN-MOS1 copy "$(TargetDir)QvxLibrary.dll" "C:\Program Files\Common Files\QlikTech\Custom Data\QvEventLogConnectorSimple"
 

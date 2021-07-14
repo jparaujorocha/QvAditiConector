@@ -9,7 +9,7 @@
                 $scope.isEdit = input.editMode;
                 $scope.id = input.instanceId;
                 $scope.titleText = $scope.isEdit ? "Editar conexão Conector Aditi" : "Adicionar Conexão Conector Aditi";
-                $scope.saveButtonText = $scope.isEdit ? "Save changes" : "Create";
+                $scope.saveButtonText = $scope.isEdit ? "Salvar Alterações" : "Adicionar";
 
                 $scope.name = "";
                 $scope.serverpostgresql = "";

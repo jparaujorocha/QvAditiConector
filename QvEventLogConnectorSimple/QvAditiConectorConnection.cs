@@ -21,21 +21,94 @@ namespace QvEventLogConnectorSimple
         private IDataReader _dataReaderStagingArea;
         private string _parameters;
         private readonly ClsUtil _util;
+        private DataTable _dataTableColumns;
+        private string[] _connectionStringParameters;
+        private LogApp _logApp;
+        private SqlConnection _connectionSqlStaging;
+        private OracleConnection _connectionOracleStaging;
+        private NpgsqlConnection _connectionPostGreSqlStaging;
 
         public QvAditiConectorConnection(QvxConnection connection)
         {
+            try
+            {
+                _logApp = new LogApp();
 
-            if (connection != null && connection.MParameters != null && connection.MParameters.Count > 0)
-                this.MParameters = connection.MParameters;
+                if (connection != null && connection.MParameters != null && connection.MParameters.Count > 0)
+                    this.MParameters = connection.MParameters;
 
-            _util = new ClsUtil();
-            _nomeTabela = " ";
-            _tipoConexao = " ";
-            _connectionString = " ";
-            _parameters = " ";
-            _connectionString = " ";
-            _dataReaderStagingArea = null;
-            Init();
+                _util = new ClsUtil();
+                _nomeTabela = " ";
+                _tipoConexao = " ";
+                _connectionString = " ";
+                _parameters = " ";
+                _dataReaderStagingArea = null;
+                _dataTableColumns = new DataTable();
+
+                GetParametersFromConnection();
+
+                if (string.IsNullOrWhiteSpace(_parameters) == false)
+                {
+                    _connectionStringParameters = _util.RecuperaParametrosConnectionString(_parameters);
+                    _tipoConexao = _connectionStringParameters[0];
+                    string connectionString = GetConnectionString(_connectionStringParameters);
+
+                    bool conexaoOk = TestarConexao(_tipoConexao, connectionString);
+
+                    if (conexaoOk == true)
+                    {
+                        _connectionString = connectionString;
+
+                        StartConnection();
+
+                        Init();
+                    }
+
+                    else
+                    {
+                        _logApp.CriarLog("ERRO na conexão com o banco de dados.");
+                    }
+                }
+
+                else
+                {
+                    QvxLog.Log(QvxLogFacility.Audit, QvxLogSeverity.Error, "Init() Erro de conexão. Verifique os dados ou o servidor.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logApp = new LogApp();
+
+                if (string.IsNullOrWhiteSpace(ex.Message) == false)
+                {
+                    QvxLog.Log(QvxLogFacility.Audit, QvxLogSeverity.Error, "Init() Erro: " + ex.Message);
+                    _logApp.CriarLog("ERRO: " + ex.Message);
+                }
+                else
+                {
+                    QvxLog.Log(QvxLogFacility.Application, QvxLogSeverity.Notice, "Init() Erro Desconhecido");
+                    _logApp.CriarLog("ERRO não identificado");
+                }
+            }
+        }
+
+        private void StartConnection()
+        {
+            if (_tipoConexao == EnumTipoDataBase.PostGreSql.ToString())
+            {
+
+                _connectionPostGreSqlStaging = new NpgsqlConnection(_connectionString);
+            }
+
+            else if (_tipoConexao == EnumTipoDataBase.Oracle.ToString())
+            {
+                _connectionOracleStaging = new OracleConnection(_connectionString);
+
+            }
+            else if (_tipoConexao == EnumTipoDataBase.Sql_Server.ToString())
+            {
+                _connectionSqlStaging = new SqlConnection(_connectionString);
+            }
         }
 
         public override void Init()
@@ -44,42 +117,8 @@ namespace QvEventLogConnectorSimple
 
             QvxLog.Log(QvxLogFacility.Application, QvxLogSeverity.Notice, "Init()");
 
-            try
-            {
-                GetParametersFromConnection();
+            GetDataStagingArea();
 
-                if (string.IsNullOrWhiteSpace(_parameters) == false)
-                {
-                    string[] connectionStringParameters = _util.RecuperaParametrosConnectionString(_parameters);
-                    _tipoConexao = connectionStringParameters[0];
-                    string connectionString = GetConnectionString(connectionStringParameters);
-
-                    bool conexaoOk = TestarConexao(_tipoConexao, connectionString);
-
-                    if (conexaoOk == true)
-                    {
-                        _connectionString = connectionString;
-                        SetInformationsFromStagingArea(_tipoConexao, _connectionString);
-                    }
-
-                    else
-                    {
-                        QvxLog.Log(QvxLogFacility.Audit, QvxLogSeverity.Error, "Init() Erro de conexão. Verifique os dados ou o servidor.");
-                    }
-                }
-
-            }
-            catch (Exception ex)
-            {
-                if (string.IsNullOrWhiteSpace(ex.Message) == false && ex.Message.Length > 0)
-                {
-                    QvxLog.Log(QvxLogFacility.Audit, QvxLogSeverity.Error, "Init() Erro: " + ex.Message);
-                }
-                else
-                {
-                    QvxLog.Log(QvxLogFacility.Application, QvxLogSeverity.Notice, "Init() Erro Desconhecido");
-                }
-            }
         }
 
         private void GetParametersFromConnection()
@@ -111,17 +150,24 @@ namespace QvEventLogConnectorSimple
             return connectionString;
         }
 
-        private QvxDataRow MakeEntry(QvxTable table, IDataReader dataReader)
+        private QvxDataRow MakeEntry(object row, QvxTable table, DataTable dadosTabela)
         {
-            var row = new QvxDataRow();
+            _logApp.CriarLog("table 1: " + dadosTabela.TableName);
 
-            for (int i = 0; i < dataReader.FieldCount; i++)
+            var qvxRow = new QvxDataRow();
+
+            for (int i = 0; i < dadosTabela.Columns.Count; i++)
             {
-                row[table.Fields.Where(a => a.FieldName == dataReader.GetName(i))
-                    .Select(b => b).FirstOrDefault()] = dataReader.GetValue(i).ToString();
+                var field = table.Fields.Where(a => a.FieldName == dadosTabela.Columns[i].ColumnName)
+                       .Select(b => b).FirstOrDefault();
+
+
+                _logApp.CriarLog("table 1: " + dadosTabela.TableName + " Field " + field.FieldName);
+
+                qvxRow[field] = row.ToString();
             }
 
-            return row;
+            return qvxRow;
         }
 
         public override QvxDataTable ExtractQuery(string query, List<QvxTable> qvxTables)
@@ -135,61 +181,86 @@ namespace QvEventLogConnectorSimple
              */
             query = Regex.Replace(query, "\\\"", "");
 
+            _logApp.CriarLog("QUERY TABELAS: " + query);
+            _logApp.CriarLog("TABELAS: " );
+
+            for (int i = 0; i < qvxTables.Count; i++)
+            {
+                _logApp.CriarLog(qvxTables[i].TableName);
+            }
+
             return base.ExtractQuery(query, qvxTables);
         }
 
-
-        private void SetInformationsFromStagingArea(string tipoConexao, string connectionString)
+        private void GetDataStagingArea()
         {
-            GetDataStagingArea(tipoConexao, connectionString);
-        }
+            this.MTables = new List<QvxTable>();
+            int contadorTabelas = 0;
+            int contadorReg = 0;
 
-        private void GetDataStagingArea(string tipoConexao, string connectionString)
-        {
-            MTables = new List<QvxTable>();
-
-            if (tipoConexao == EnumTipoDataBase.PostGreSql.ToString())
+            if (_tipoConexao == EnumTipoDataBase.PostGreSql.ToString())
             {
-                string stringConnectionPostGreSqlStaging = connectionString;
-                NpgsqlConnection connectionPostGreSqlStaging = new NpgsqlConnection(stringConnectionPostGreSqlStaging);
+                DataTable schemaTables = _connectionPostGreSqlStaging.GetSchema("Tables");
 
-                connectionPostGreSqlStaging.Open();
-
-                DataTable schemaTables = connectionPostGreSqlStaging.GetSchema("Tables");
-
-                connectionPostGreSqlStaging.Close();
+                //MUDAR DE LOCAL connectionPostGreSqlStaging.Close();
 
                 foreach (DataRow row in schemaTables.Rows)
                 {
+                    _connectionPostGreSqlStaging.Open();
+                    contadorReg = 0;
+                    contadorTabelas++;
                     _nomeTabela = (string)row[2];
-                    DataTable colunasTabela = connectionPostGreSqlStaging.GetSchema("Columns", new[] { connectionPostGreSqlStaging.DataSource, null, _nomeTabela });
-                    _dataReaderStagingArea = GetDataReader(tipoConexao, _nomeTabela, connectionString);
+                    _dataTableColumns = new DataTable(_nomeTabela);
 
-                    MTables.Add(new QvxTable
+                    if(_nomeTabela == "tasy_dm_ep01_empr")
+                    {
+
+                    }
+
+                    _dataReaderStagingArea = GetDataReader(_tipoConexao, _nomeTabela, _connectionPostGreSqlStaging);
+
+                    int quantidadeCamposConsulta = _dataReaderStagingArea.FieldCount;
+                    object[] ColArray = new object[quantidadeCamposConsulta];
+
+                    QvxField[] fieldsTabela = GetFieldsConnector(_dataReaderStagingArea);
+
+                    _logApp.CriarLog("CRIOU OS CAMPOS");
+
+                    while (_dataReaderStagingArea.Read())
+                    {
+                        contadorReg++;
+                        for (int i = 0; i < quantidadeCamposConsulta; i++)
+                        {
+                            ColArray[i] = _dataReaderStagingArea[_dataReaderStagingArea.GetName(i)];
+                        }
+
+                        _dataTableColumns.LoadDataRow(ColArray, true);
+                    }
+
+                    _logApp.CriarLog("ROWS DTB 1: " + _dataTableColumns.Rows.Count);
+                    _logApp.CriarLog("Numero REGISTROS TABELA " + _nomeTabela + ": " + contadorReg);
+                    
+                    this.MTables.Add(new QvxTable
                     {
                         TableName = _nomeTabela,
                         GetRows = GetDataRowsConnector,
-                        Fields = GetFieldsConnector(_dataReaderStagingArea)
+                        Fields = fieldsTabela
                     });
+                    _connectionPostGreSqlStaging.Close();
                 }
             }
 
-            else if (tipoConexao == EnumTipoDataBase.Sql_Server.ToString())
+            else if (_tipoConexao == EnumTipoDataBase.Sql_Server.ToString())
             {
-                string stringConnectionStagingSql = connectionString;
-                SqlConnection connectionSqlStaging = new SqlConnection(stringConnectionStagingSql);
+                _connectionSqlStaging.Open();
 
-                connectionSqlStaging.Open();
-
-                DataTable schemaTables = connectionSqlStaging.GetSchema("Tables");
-
-                connectionSqlStaging.Close();
-
+                DataTable schemaTables = _connectionSqlStaging.GetSchema("Tables");
+                
                 foreach (DataRow row in schemaTables.Rows)
                 {
                     _nomeTabela = (string)row[2];
-                    DataTable colunasTabela = connectionSqlStaging.GetSchema("Columns", new[] { connectionSqlStaging.DataSource, null, _nomeTabela });
-                    _dataReaderStagingArea = GetDataReader(tipoConexao, _nomeTabela, connectionString);
+                    DataTable colunasTabela = _connectionSqlStaging.GetSchema("Columns", new[] { _connectionSqlStaging.DataSource, null, _nomeTabela });
+                    _dataReaderStagingArea = GetDataReader(_tipoConexao, _nomeTabela, null, _connectionSqlStaging);
 
                     MTables.Add(new QvxTable
                     {
@@ -198,23 +269,22 @@ namespace QvEventLogConnectorSimple
                         Fields = GetFieldsConnector(_dataReaderStagingArea)
                     });
                 }
+
+                _connectionSqlStaging.Close();
             }
-            else if (tipoConexao == EnumTipoDataBase.Oracle.ToString())
+            else if (_tipoConexao == EnumTipoDataBase.Oracle.ToString())
             {
-                string stringConnectionStagingOracle = connectionString;
-                OracleConnection connectionOracleStaging = new OracleConnection(stringConnectionStagingOracle);
+                _connectionOracleStaging.Open();
 
-                connectionOracleStaging.Open();
+                DataTable schemaTables = _connectionOracleStaging.GetSchema("Tables");
 
-                DataTable schemaTables = connectionOracleStaging.GetSchema("Tables");
-
-                connectionOracleStaging.Close();
+                _connectionOracleStaging.Close();
 
                 foreach (DataRow row in schemaTables.Rows)
                 {
                     _nomeTabela = (string)row[2];
-                    DataTable colunasTabela = connectionOracleStaging.GetSchema("Columns", new[] { connectionOracleStaging.DataSource, null, _nomeTabela });
-                    _dataReaderStagingArea = GetDataReader(tipoConexao, _nomeTabela, connectionString);
+                    DataTable colunasTabela = _connectionOracleStaging.GetSchema("Columns", new[] { _connectionOracleStaging.DataSource, null, _nomeTabela });
+                    _dataReaderStagingArea = GetDataReader(_tipoConexao, _nomeTabela, null, null, _connectionOracleStaging);
 
                     MTables.Add(new QvxTable
                     {
@@ -223,6 +293,8 @@ namespace QvEventLogConnectorSimple
                         Fields = GetFieldsConnector(_dataReaderStagingArea)
                     });
                 }
+
+                _connectionOracleStaging.Close();
             }
         }
 
@@ -268,6 +340,8 @@ namespace QvEventLogConnectorSimple
         }
         private QvxField[] GetFieldsConnector(IDataReader dataReader)
         {
+            _logApp.CriarLog("ENTROU FIELDS: ");
+
             QvxField[] fieldsConectorAditiStaging = new QvxField[0];
             if (dataReader != null)
             {
@@ -283,29 +357,32 @@ namespace QvEventLogConnectorSimple
 QvxNullRepresentation.QVX_NULL_FLAG_SUPPRESS_DATA, FieldAttrType.ASCII);
 
                     fieldsConectorAditiStaging[i] = qvxField;
+
+                    _dataTableColumns.Columns.Add(dataReader.GetName(i));
                 }
             }
 
             return fieldsConectorAditiStaging;
         }
-
         private IEnumerable<QvxDataRow> GetDataRowsConnector()
         {
-            while (_dataReaderStagingArea.Read())
+            var dadosTabela = _dataTableColumns;
+
+            _logApp.CriarLog("ENTROU GET DATA ROWS CONNECTOR: ");
+            _logApp.CriarLog("GetDataRowsConnector: " + dadosTabela.Rows.Count);
+
+            foreach (var item in dadosTabela.Rows)
             {
-                yield return MakeEntry(FindTable(_nomeTabela, MTables), _dataReaderStagingArea);
+                yield return MakeEntry(item, FindTable(_nomeTabela, MTables), dadosTabela);
             }
         }
 
-        private IDataReader GetDataReader(string tipoConexao, string nomeTabela, string connectionString)
+        private IDataReader GetDataReader(string tipoConexao, string nomeTabela, NpgsqlConnection connectionPostGreSqlStaging = null, SqlConnection connectionSqlStaging = null, OracleConnection connectionOracleStaging = null)
         {
             if (tipoConexao == EnumTipoDataBase.PostGreSql.ToString())
             {
                 string instrucaoSql = "Select * From " + nomeTabela;
-                NpgsqlConnection connectionPostGreSqlStaging = new NpgsqlConnection(connectionString);
 
-                //BUSCAR DADOS STAGING AREA
-                connectionPostGreSqlStaging.Open();
                 NpgsqlCommand comandoBuscarDadosStagingArea = new NpgsqlCommand(instrucaoSql, connectionPostGreSqlStaging);
                 comandoBuscarDadosStagingArea.CommandType = CommandType.Text;
                 NpgsqlDataReader postGreSqlDataReader = comandoBuscarDadosStagingArea.ExecuteReader();
@@ -316,28 +393,23 @@ QvxNullRepresentation.QVX_NULL_FLAG_SUPPRESS_DATA, FieldAttrType.ASCII);
             else if (tipoConexao == EnumTipoDataBase.Sql_Server.ToString())
             {
                 string instrucaoSql = "Select * From " + nomeTabela;
-                SqlConnection connectionSqlStaging = new SqlConnection(connectionString);
 
                 //BUSCAR DADOS STAGING AREA
-                connectionSqlStaging.Open();
                 SqlCommand comandoBuscarDadosStagingArea = new SqlCommand(instrucaoSql, connectionSqlStaging);
                 comandoBuscarDadosStagingArea.CommandType = CommandType.Text;
                 SqlDataReader sqlDataReader = comandoBuscarDadosStagingArea.ExecuteReader();
-                connectionSqlStaging.Close();
 
                 return sqlDataReader;
             }
             else if (tipoConexao == EnumTipoDataBase.Oracle.ToString())
             {
                 string instrucaoSql = "Select * From " + nomeTabela;
-                OracleConnection connectionOracleStaging = new OracleConnection(connectionString);
 
                 //BUSCAR DADOS STAGING AREA
-                connectionOracleStaging.Open();
+
                 OracleCommand comandoBuscarDadosStagingArea = new OracleCommand(instrucaoSql, connectionOracleStaging);
                 comandoBuscarDadosStagingArea.CommandType = CommandType.Text;
                 OracleDataReader oracleDataReader = comandoBuscarDadosStagingArea.ExecuteReader();
-                connectionOracleStaging.Close();
                 return oracleDataReader;
             }
             return null;

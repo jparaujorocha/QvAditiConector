@@ -41,12 +41,14 @@
                 });
                 console.log("FIE2")
 			},
-            getPreview: function ( /*databaseName, ownerName, tableName*/) {
-                console.log("PV")
-                return qvangular.promise([]);
+            getPreview: function (qDatabaseName, qOwnerName, qTableName) {
 
-                console.log("PV2")
-			}
+                console.log("PV1")
+                return serverside.sendJsonRequest("getPreview", qDatabaseName, qOwnerName, qTableName).then(function (response) {
+                    return qvangular.promise(response.qPreview);
+                });
+
+            }
 		};
 
 		standardSelectDialogService.showStandardDialog( eventlogDialogContentProvider, {

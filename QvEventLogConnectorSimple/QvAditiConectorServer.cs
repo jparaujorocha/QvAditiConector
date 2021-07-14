@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data.SqlClient;
+using System.Linq;
 using System.Security.Authentication;
 using Npgsql;
 using Oracle.ManagedDataAccess.Client;
@@ -53,6 +55,9 @@ namespace QvEventLogConnectorSimple
                 case "getFields":
                     response = GetFields(connection, userParameters[2]);
                     break;
+                case "getPreview":
+                    response = GetPreviewData(connection, userParameters[2]);
+                    break;
                 case "testConnection":
                     response = TestConnection(userParameters[0], userParameters[1]);
                     break;
@@ -63,6 +68,42 @@ namespace QvEventLogConnectorSimple
 
             return ToJson(response);
 
+        }
+        private QvDataContractResponse GetPreviewData(QvxConnection connection, string table)
+        {
+            var currentTable = connection.FindTable(table, connection.MTables);
+
+            PreviewRow pRow = new PreviewRow();
+            PreviewResponse pResp = new PreviewResponse();
+
+            pRow.qValues = (currentTable != null) ? currentTable.GetRows().ToList() : new List<QvxDataRow>();
+
+            pResp.qPreview = pRow.qValues;
+
+            LogApp logA = new LogApp();
+
+
+            logA.CriarLog("Quantidade: " + currentTable.GetRows().Count());
+            logA.CriarLog("Valor DATAROW: " + currentTable.GetRows().Count());
+            for (int i = 0; i < pRow.qValues.Count(); i++)
+            {
+                logA.CriarLog(pRow.qValues[i].ToString());
+
+            }
+            logA.CriarLog("Valor DATAVALUE: " + currentTable.GetRows().Count());
+
+            for (int i = 0; i < pRow.qValues.Count(); i++)
+            {
+                var field = currentTable.Fields.Where(a => a.FieldName == "cd_pf_auditor")
+                       .Select(b => b).FirstOrDefault();
+                logA.CriarLog(pRow.qValues[i][field].ToString());
+            }
+
+            return new PreviewResponse
+            {
+
+                qPreview = pResp.qPreview
+            };
         }
 
         private QvDataContractResponse GetInfo()
@@ -102,6 +143,7 @@ namespace QvEventLogConnectorSimple
             };
         }
 
+
         private QvDataContractResponse TestConnection(string tipoConexao, string connectionString)
         {
             string message = "Conexão com erro. Confira os dados ou o servidor.";
@@ -116,37 +158,72 @@ namespace QvEventLogConnectorSimple
         private bool TestarConexao(string tipoConexao, string connectionString)
         {
 
-            if (tipoConexao == EnumTipoDataBase.PostGreSql.ToString())
+            try
             {
-                string stringConnectionPostGreSqlStaging = connectionString;
-                NpgsqlConnection connectionPostGreSqlStaging = new NpgsqlConnection(stringConnectionPostGreSqlStaging);
-                connectionPostGreSqlStaging.Open();
-                connectionPostGreSqlStaging.Close();
+                if (tipoConexao == EnumTipoDataBase.PostGreSql.ToString())
+                {
+                    string stringConnectionPostGreSqlStaging = connectionString;
+                    NpgsqlConnection connectionPostGreSqlStaging = new NpgsqlConnection(stringConnectionPostGreSqlStaging);
+                    connectionPostGreSqlStaging.Open();
+                    connectionPostGreSqlStaging.Close();
 
-                return true;
+                    return true;
+                }
+
+                else if (tipoConexao == EnumTipoDataBase.Sql_Server.ToString())
+                {
+                    string stringConnectionSqlExterno = connectionString;
+                    SqlConnection connectionSqlStaging = new SqlConnection(stringConnectionSqlExterno);
+                    connectionSqlStaging.Open();
+                    connectionSqlStaging.Close();
+
+                    return true;
+
+                }
+                else if (tipoConexao == EnumTipoDataBase.Oracle.ToString())
+                {
+                    OracleConnection connectionOracleStaging = new OracleConnection(connectionString);
+                    connectionOracleStaging.Open();
+                    connectionOracleStaging.Close();
+
+                    return true;
+                }
+
+                return false;
             }
-
-            else if (tipoConexao == EnumTipoDataBase.Sql_Server.ToString())
+            catch (Exception ex)
             {
-                string stringConnectionSqlExterno = connectionString;
-                SqlConnection connectionSqlStaging = new SqlConnection(stringConnectionSqlExterno);
-                connectionSqlStaging.Open();
-                connectionSqlStaging.Close();
-
-                return true;
-
+                return false;
             }
-            else if (tipoConexao == EnumTipoDataBase.Oracle.ToString())
-            {
-                OracleConnection connectionOracleStaging = new OracleConnection(connectionString);
-                connectionOracleStaging.Open();
-                connectionOracleStaging.Close();
-
-                return true;
-            }
-
-            return false;
         }
+
+    }
+
+    public class PreviewRow
+    {
+        public PreviewRow()
+        {
+            this.qValues = new List<QvxDataRow>();
+        }
+
+        public List<QvxDataRow> qValues { get; set; }
+    }
+
+
+
+    public class PreviewResponse : QvDataContractResponse
+
+    {
+
+        public PreviewResponse() : base()
+
+        {
+
+            this.qPreview = new List<QvxDataRow>();
+
+        }
+
+        public List<QvxDataRow> qPreview { get; set; }
 
     }
 }
