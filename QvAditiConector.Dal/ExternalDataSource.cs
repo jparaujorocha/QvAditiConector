@@ -50,7 +50,7 @@ namespace QvAditiConector.Dal
             {
                 if (_tipoConexao == EnumTipoDataBase.PostGreSql.ToString())
                 {
-                    _connectionPostGreSqlStaging = new NpgsqlConnection("server=127.0.0.1;Port=5432;user id=postgres; password=123456;database=ConectorAditiStaging");
+                    _connectionPostGreSqlStaging = new NpgsqlConnection(_connectionString);
                 }
 
                 else if (_tipoConexao == EnumTipoDataBase.Oracle.ToString())
