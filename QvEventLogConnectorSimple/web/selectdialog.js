@@ -40,14 +40,9 @@
 					return response.qFields;
                 });
                 console.log("FIE2")
-			},
-            getPreview: function (qDatabaseName, qOwnerName, qTableName) {
-
-                console.log("PV1")
-                return serverside.sendJsonRequest("getPreview", qDatabaseName, qOwnerName, qTableName).then(function (response) {
-                    return qvangular.promise(response.qPreview);
-                });
-
+            },
+            getPreview: function ( /*databaseName, ownerName, tableName*/) {
+                return qvangular.promise([]);
             }
 		};
 

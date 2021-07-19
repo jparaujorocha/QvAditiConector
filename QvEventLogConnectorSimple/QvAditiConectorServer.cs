@@ -15,6 +15,9 @@ namespace QvEventLogConnectorSimple
     {
         private string _parameters = "";
         private QvxConnection _qvxConnection;
+        private string[] _connectionStringParameters;
+        private ClsUtil _util;
+        private string _tipoConexao;
 
         public override QvxConnection CreateConnection()
         {
@@ -24,6 +27,7 @@ namespace QvEventLogConnectorSimple
         public override string CreateConnectionString()
         {
             QvxLog.Log(QvxLogFacility.Application, QvxLogSeverity.Debug, "CreateConnectionString()");
+
             return "localhost";
         }
 
@@ -194,6 +198,51 @@ namespace QvEventLogConnectorSimple
             catch (Exception ex)
             {
                 return false;
+            }
+        }
+
+        private string GetConnectionString()
+        {
+            try
+            {
+                string connectionString = " ";
+
+                if (_tipoConexao == EnumTipoDataBase.PostGreSql.ToString())
+                {
+                    connectionString = "server=" + _connectionStringParameters[1] + ";port=" + _connectionStringParameters[2] + ";userid=" + _connectionStringParameters[3] + ";password=" + _connectionStringParameters[4] + ";database=ConectorAditiStaging";
+                }
+
+                else if (_tipoConexao == EnumTipoDataBase.Oracle.ToString())
+                {
+                    connectionString = "Data Source=ConectorAditiStaging;User ID=" + _connectionStringParameters[0] + ";Password=" + _connectionStringParameters[1] + ";Connection Timeout=1500;";
+                }
+                else if (_tipoConexao == EnumTipoDataBase.Sql_Server.ToString())
+                {
+                    connectionString = "Data Source=ConectorAditiStaging;Initial Catalog=" + _connectionStringParameters[0] + ";User ID=" + _connectionStringParameters[1] + ";Password=" + _connectionStringParameters[2] + ";";
+                }
+
+                return connectionString;
+            }
+
+            catch (Exception ex)
+            {
+                throw new Exception(ex + "GetConnectionString");
+            }
+        }
+
+        private void GetParametersFromConnection()
+        {
+            try
+            {
+                if (_qvxConnection.MParameters != null && _qvxConnection.MParameters.Count > 0)
+                {
+                    _qvxConnection.MParameters.TryGetValue("Xtype", out _parameters);
+                }
+            }
+
+            catch (Exception ex)
+            {
+                throw new Exception(ex + "GetParametersFromConnection()");
             }
         }
 
